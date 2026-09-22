@@ -34,7 +34,10 @@ async function main() {
       await plaidClient.itemWebhookUpdate({ access_token: accessToken, webhook: webhookUrl });
       console.log(`OK: ${item.institutionName}`);
     } catch (error) {
-      console.error(`FAILED: ${item.institutionName}`, error instanceof Error ? error.message : error);
+      const isAxiosError = (e: unknown): e is { response?: { data?: unknown } } =>
+        typeof e === "object" && e !== null && "response" in e;
+      const detail = isAxiosError(error) ? JSON.stringify(error.response?.data) : error instanceof Error ? error.message : error;
+      console.error(`FAILED: ${item.institutionName}`, detail);
     }
   }
 
