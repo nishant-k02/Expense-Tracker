@@ -42,11 +42,19 @@ export default async function SettingsPage() {
       </section>
 
       <section className="rounded-xl border border-black/10 p-4 dark:border-white/15">
-        <h2 className="mb-3 font-medium">Categories</h2>
+        <h2 className="font-medium">Categories</h2>
+        <p className="mb-3 mt-1 text-sm text-foreground/60">
+          Categories marked <span className="text-foreground/50">(excluded)</span> represent money moving between
+          your own accounts — transfers and credit card payments — and are left out of dashboard totals to avoid
+          double-counting.
+        </p>
         <ul className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
           {categories.map((category) => (
             <li key={category.id} className="flex items-center justify-between">
-              <span>{category.name}</span>
+              <span>
+                {category.name}
+                {category.excludeFromTotals && <span className="ml-1 text-xs text-foreground/50">(excluded)</span>}
+              </span>
               <span className="text-foreground/50">{category._count.transactions}</span>
             </li>
           ))}

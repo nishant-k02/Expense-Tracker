@@ -3,6 +3,7 @@ import { plaidClient } from "@/lib/plaid";
 import { prisma } from "@/lib/prisma";
 import { decrypt } from "@/lib/crypto";
 import { resolveCategoryId } from "@/lib/categories";
+import { detectInternalTransfers } from "@/lib/transfer-matching";
 
 async function upsertAccounts(itemId: string, accounts: AccountBase[]) {
   for (const account of accounts) {
@@ -41,7 +42,7 @@ async function upsertTransaction(tx: PlaidTransaction) {
   const existing = await prisma.transaction.findUnique({ where: { plaidTransactionId: tx.transaction_id } });
   const categoryId = existing?.categoryOverridden
     ? existing.categoryId
-    : await resolveCategoryId(tx.personal_finance_category?.primary ?? null);
+    : await resolveCategoryId(tx.personal_finance_category?.primary ?? null, tx.personal_finance_category?.detailed ?? null);
 
   await prisma.transaction.upsert({
     where: { plaidTransactionId: tx.transaction_id },
@@ -55,6 +56,7 @@ async function upsertTransaction(tx: PlaidTransaction) {
       name: tx.name,
       pending: tx.pending,
       plaidCategoryPrimary: tx.personal_finance_category?.primary ?? null,
+      plaidCategoryDetailed: tx.personal_finance_category?.detailed ?? null,
       categoryId,
     },
     create: {
@@ -68,6 +70,7 @@ async function upsertTransaction(tx: PlaidTransaction) {
       name: tx.name,
       pending: tx.pending,
       plaidCategoryPrimary: tx.personal_finance_category?.primary ?? null,
+      plaidCategoryDetailed: tx.personal_finance_category?.detailed ?? null,
       categoryId,
     },
   });
@@ -110,6 +113,8 @@ export async function syncTransactionsForItem(itemId: string): Promise<void> {
         data: { cursor, status: "active", error: null },
       });
     }
+
+    await detectInternalTransfers();
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown sync error";
     await prisma.item.update({

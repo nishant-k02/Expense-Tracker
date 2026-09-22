@@ -40,12 +40,16 @@ model Account {
 }
 
 model Category {
-  id           String        @id @default(cuid())
-  name         String        @unique
-  plaidPrimary String?       @unique
-  icon         String?
-  isDefault    Boolean       @default(false)
-  transactions Transaction[]
+  id                String        @id @default(cuid())
+  name              String        @unique
+  plaidPrimary      String?       @unique
+  icon              String?
+  isDefault         Boolean       @default(false)
+  // True for categories that represent money moving between the user's own
+  // accounts (transfers, credit card bill payments) rather than real income
+  // or spending. Excluded from dashboard totals to avoid double-counting.
+  excludeFromTotals Boolean       @default(false)
+  transactions      Transaction[]
 }
 
 model Transaction {
@@ -61,9 +65,15 @@ model Transaction {
   name                 String
   pending              Boolean     @default(false)
   plaidCategoryPrimary String?
+  plaidCategoryDetailed String?
   categoryId           String?
   category             Category?   @relation(fields: [categoryId], references: [id])
   categoryOverridden   Boolean     @default(false)
+  // True when this transaction has been matched to an equal-and-opposite
+  // transaction in another of the user's own linked accounts (e.g. a Chase
+  // -> PNC transfer), as opposed to a payment to/from someone else. Computed
+  // by detectInternalTransfers(); excluded from dashboard totals.
+  isInternalTransfer   Boolean     @default(false)
   createdAt            DateTime    @default(now())
   updatedAt            DateTime    @updatedAt
 

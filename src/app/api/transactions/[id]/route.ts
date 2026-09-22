@@ -21,9 +21,12 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/transactio
     return NextResponse.json({ error: "Unknown category" }, { status: 400 });
   }
 
+  // A manual recategorization means the user has reviewed this transaction and
+  // confirmed it's real — clear any automatic "internal transfer" flag so it
+  // counts toward totals under its new category.
   const transaction = await prisma.transaction.update({
     where: { id },
-    data: { categoryId, categoryOverridden: true },
+    data: { categoryId, categoryOverridden: true, isInternalTransfer: false },
   });
 
   return NextResponse.json({ transaction });
