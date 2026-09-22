@@ -107,6 +107,14 @@ export default async function TransactionsPage(props: PageProps<"/transactions">
                   <td className="px-3 py-2">
                     {tx.merchantName ?? tx.name}
                     {tx.pending && <span className="ml-2 text-xs text-amber-600 dark:text-amber-400">Pending</span>}
+                    {(tx.isInternalTransfer || tx.category?.excludeFromTotals) && (
+                      <span
+                        className="ml-2 text-xs text-foreground/50"
+                        title="Money moving between your own accounts — excluded from spend/income totals"
+                      >
+                        Transfer
+                      </span>
+                    )}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2 text-foreground/70">{tx.account.name}</td>
                   <td className="whitespace-nowrap px-3 py-2">
