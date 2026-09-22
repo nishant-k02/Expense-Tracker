@@ -1,6 +1,11 @@
 import { Repeat, AlertCircle, TrendingUp } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { syncDetectedSubscriptions, isDueSoon } from "@/lib/subscriptions";
+import {
+  syncDetectedSubscriptions,
+  syncInvestmentSchedules,
+  flagOverdueSubscriptionsInactive,
+  isDueSoon,
+} from "@/lib/subscriptions";
 import { formatCurrency, formatDate } from "@/lib/format";
 import {
   Card,
@@ -34,6 +39,8 @@ const FREQUENCY_LABEL: Record<string, string> = {
 
 export default async function SubscriptionsPage() {
   await syncDetectedSubscriptions();
+  await syncInvestmentSchedules();
+  await flagOverdueSubscriptionsInactive();
 
   const [subscriptions, accounts] = await Promise.all([
     prisma.subscription.findMany({
