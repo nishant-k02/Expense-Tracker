@@ -10,6 +10,14 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 export const dynamic = "force-dynamic";
 
+const AVATAR_COLORS = [
+  "bg-primary/15 text-primary",
+  "bg-chip-purple/15 text-chip-purple",
+  "bg-chip-pink/15 text-chip-pink",
+  "bg-chip-blue/15 text-chip-blue",
+  "bg-chip-amber/15 text-chip-amber",
+];
+
 export default async function AccountsPage() {
   const items = await prisma.item.findMany({
     include: { accounts: true },
@@ -41,12 +49,12 @@ export default async function AccountsPage() {
       )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {items.map((item) => (
+        {items.map((item, index) => (
           <Card key={item.id}>
             <CardHeader className="flex-row items-center justify-between space-y-0">
               <div className="flex items-center gap-3">
                 <Avatar className="size-9">
-                  <AvatarFallback className="bg-primary/10 text-sm font-medium text-primary">
+                  <AvatarFallback className={`text-sm font-medium ${AVATAR_COLORS[index % AVATAR_COLORS.length]}`}>
                     {item.institutionName.slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
