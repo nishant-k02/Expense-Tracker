@@ -6,6 +6,17 @@ datasource db {
   provider = "postgresql"
 }
 
+// Single-row profile for the app's one user. Always read/written by the
+// fixed id "singleton" — see src/lib/profile.ts.
+model Profile {
+  id            String   @id @default("singleton")
+  name          String?
+  // Small avatar image stored inline as a data URL (data:image/...;base64,...).
+  // Fine at single-user scale; avoids standing up separate blob storage.
+  avatarDataUrl String?
+  updatedAt     DateTime @updatedAt
+}
+
 model Item {
   id               String    @id @default(cuid())
   plaidItemId      String    @unique

@@ -1,6 +1,9 @@
 import { CheckCircle2, AlertTriangle } from "lucide-react";
+import { auth } from "@/lib/auth";
+import { getProfile } from "@/lib/profile";
 import { prisma } from "@/lib/prisma";
 import { SyncButton } from "@/components/plaid/SyncButton";
+import { ProfileForm } from "@/components/settings/ProfileForm";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +11,9 @@ import { Badge } from "@/components/ui/badge";
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const [categories, items] = await Promise.all([
+  const [session, profile, categories, items] = await Promise.all([
+    auth(),
+    getProfile(),
     prisma.category.findMany({
       orderBy: { name: "asc" },
       include: { _count: { select: { transactions: true } } },
@@ -16,16 +21,35 @@ export default async function SettingsPage() {
     prisma.item.findMany({ orderBy: { createdAt: "asc" } }),
   ]);
 
+  const email = session?.user?.email ?? "";
+
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
 
-      <Tabs defaultValue="general">
+      <Tabs defaultValue="profile">
         <TabsList>
+          <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="connections">Connections</TabsTrigger>
           <TabsTrigger value="categories">Categories</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="profile" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Profile</CardTitle>
+              <CardDescription>Shown in the sidebar. Signed in as {email}.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ProfileForm
+                initialName={profile?.name ?? ""}
+                initialAvatarDataUrl={profile?.avatarDataUrl ?? null}
+                fallbackLabel={(profile?.name || email).slice(0, 2).toUpperCase()}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="general" className="mt-4">
           <Card>

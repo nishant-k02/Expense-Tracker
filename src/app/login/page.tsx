@@ -31,15 +31,13 @@ export default async function LoginPage(props: PageProps<"/login">) {
   }
 
   return (
-    <main className="flex flex-1 items-center justify-center px-4 py-12">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <div className="mb-1 flex items-center gap-2">
-            <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <Wallet className="size-5" />
-            </div>
-            <CardTitle className="text-lg">Expense Tracker</CardTitle>
+    <main className="auth-gradient flex flex-1 items-center justify-center overflow-hidden bg-background px-4 py-12">
+      <Card className="w-full max-w-sm border-white/10 bg-card/90 backdrop-blur-sm">
+        <CardHeader className="items-center text-center">
+          <div className="mb-1 flex size-11 items-center justify-center rounded-xl bg-primary/15 text-primary">
+            <Wallet className="size-5" />
           </div>
+          <CardTitle className="text-xl tracking-tight">Expense Tracker</CardTitle>
           <CardDescription>Sign in to continue</CardDescription>
         </CardHeader>
         <CardContent>

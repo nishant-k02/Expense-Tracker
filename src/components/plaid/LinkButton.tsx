@@ -48,7 +48,7 @@ export function LinkButton() {
 
   return (
     <div className="flex flex-col items-end gap-2">
-      <Button type="button" onClick={() => open()} disabled={!ready || loading}>
+      <Button type="button" className="rounded-full" onClick={() => open()} disabled={!ready || loading}>
         <Plus className="size-4" />
         {loading ? "Linking..." : "Link a bank account"}
       </Button>

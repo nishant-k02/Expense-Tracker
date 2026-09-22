@@ -4,13 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
-export function NavLink({
+export function SidebarNavLink({
   href,
-  className,
+  icon,
   children,
 }: {
   href: string;
-  className?: string;
+  icon: React.ReactNode;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -20,11 +20,13 @@ export function NavLink({
     <Link
       href={href}
       className={cn(
-        "text-sm font-medium transition-colors",
-        active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
-        className
+        "flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-colors",
+        active
+          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+          : "text-sidebar-foreground/60 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
       )}
     >
+      {icon}
       {children}
     </Link>
   );

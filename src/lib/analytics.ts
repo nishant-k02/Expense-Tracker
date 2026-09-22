@@ -91,6 +91,35 @@ export async function getSpendByInstitution(reference: Date = new Date()) {
   return Array.from(totals.values()).sort((a, b) => b.spend - a.spend);
 }
 
+export async function getRecentTransactions(limit = 6) {
+  const transactions = await prisma.transaction.findMany({
+    orderBy: { date: "desc" },
+    take: limit,
+    select: {
+      id: true,
+      date: true,
+      name: true,
+      merchantName: true,
+      amount: true,
+      isoCurrencyCode: true,
+      isInternalTransfer: true,
+      category: { select: { name: true, excludeFromTotals: true } },
+      account: { select: { name: true } },
+    },
+  });
+
+  return transactions.map((tx) => ({
+    id: tx.id,
+    date: tx.date,
+    description: tx.merchantName ?? tx.name,
+    amount: Number(tx.amount),
+    currency: tx.isoCurrencyCode ?? "USD",
+    accountName: tx.account.name,
+    categoryName: tx.category?.name ?? "Uncategorized",
+    isTransfer: tx.isInternalTransfer || Boolean(tx.category?.excludeFromTotals),
+  }));
+}
+
 export async function getMonthlyTrend(monthsBack = 6) {
   const now = new Date();
   const months: { label: string; start: Date; end: Date }[] = [];
