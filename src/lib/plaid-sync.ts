@@ -82,11 +82,30 @@ async function removeTransactions(removed: RemovedTransaction[]) {
   await prisma.transaction.deleteMany({ where: { plaidTransactionId: { in: ids } } });
 }
 
-export async function syncTransactionsForItem(itemId: string): Promise<void> {
+/**
+ * Actively asks Plaid to poll the bank right now, instead of waiting for
+ * Plaid's own passive refresh interval (which can lag by hours). This is
+ * asynchronous on Plaid's side — it doesn't make new data available in this
+ * same request. Once Plaid finishes, it fires a TRANSACTIONS/
+ * SYNC_UPDATES_AVAILABLE webhook (see /api/plaid/webhook), which triggers
+ * another sync automatically. Best-effort: not every institution supports
+ * on-demand refresh, so a failure here must never block the regular sync.
+ */
+async function requestRefresh(accessToken: string): Promise<void> {
+  try {
+    await plaidClient.transactionsRefresh({ access_token: accessToken });
+  } catch (error) {
+    console.warn("transactionsRefresh not available for this item:", error instanceof Error ? error.message : error);
+  }
+}
+
+export async function syncTransactionsForItem(itemId: string, refresh = true): Promise<void> {
   const item = await prisma.item.findUnique({ where: { id: itemId } });
   if (!item) throw new Error(`Item ${itemId} not found`);
 
   const accessToken = decrypt(item.plaidAccessToken);
+  if (refresh) await requestRefresh(accessToken);
+
   let cursor = item.cursor ?? undefined;
   let hasMore = true;
 
