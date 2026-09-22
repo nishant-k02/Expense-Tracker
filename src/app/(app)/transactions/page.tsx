@@ -1,7 +1,14 @@
 import { prisma } from "@/lib/prisma";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { CategorySelect } from "@/components/transactions/CategorySelect";
+import { TransactionFilters } from "@/components/transactions/TransactionFilters";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ReceiptText } from "lucide-react";
 import type { Prisma } from "@prisma/client";
+
+export const dynamic = "force-dynamic";
 
 export default async function TransactionsPage(props: PageProps<"/transactions">) {
   const searchParams = await props.searchParams;
@@ -10,7 +17,7 @@ export default async function TransactionsPage(props: PageProps<"/transactions">
   const q = typeof searchParams.q === "string" ? searchParams.q : undefined;
 
   const [accounts, categories] = await Promise.all([
-    prisma.account.findMany({ orderBy: { name: "asc" } }),
+    prisma.account.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
     prisma.category.findMany({ orderBy: { name: "asc" } }),
   ]);
 
@@ -36,106 +43,124 @@ export default async function TransactionsPage(props: PageProps<"/transactions">
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">Transactions</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Transactions</h1>
 
-      <form className="flex flex-wrap items-end gap-3 text-sm" method="get">
-        <label className="flex flex-col gap-1">
-          Search
-          <input
-            type="text"
-            name="q"
-            defaultValue={q}
-            placeholder="Merchant or description"
-            className="rounded-md border border-black/10 bg-transparent px-2 py-1.5 dark:border-white/15"
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          Account
-          <select
-            name="account"
-            defaultValue={accountId ?? ""}
-            className="rounded-md border border-black/10 bg-transparent px-2 py-1.5 dark:border-white/15"
-          >
-            <option value="">All accounts</option>
-            {accounts.map((account) => (
-              <option key={account.id} value={account.id}>
-                {account.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1">
-          Category
-          <select
-            name="category"
-            defaultValue={categoryId ?? ""}
-            className="rounded-md border border-black/10 bg-transparent px-2 py-1.5 dark:border-white/15"
-          >
-            <option value="">All categories</option>
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button
-          type="submit"
-          className="rounded-md border border-black/10 px-3 py-1.5 transition hover:bg-black/5 dark:border-white/15 dark:hover:bg-white/10"
-        >
-          Filter
-        </button>
-      </form>
+      <TransactionFilters
+        accounts={accounts}
+        categories={categories}
+        defaultQuery={q}
+        defaultAccount={accountId}
+        defaultCategory={categoryId}
+      />
 
-      <div className="overflow-x-auto rounded-xl border border-black/10 dark:border-white/15">
-        <table className="w-full text-left text-sm">
-          <thead className="border-b border-black/10 text-foreground/60 dark:border-white/15">
-            <tr>
-              <th className="px-3 py-2 font-medium">Date</th>
-              <th className="px-3 py-2 font-medium">Description</th>
-              <th className="px-3 py-2 font-medium">Account</th>
-              <th className="px-3 py-2 font-medium">Category</th>
-              <th className="px-3 py-2 text-right font-medium">Amount</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-black/5 dark:divide-white/10">
+      {transactions.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
+            <div className="flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+              <ReceiptText className="size-6" />
+            </div>
+            <p className="text-sm text-muted-foreground">No transactions found.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {/* Desktop table */}
+          <Card className="hidden overflow-hidden sm:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead>Account</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {transactions.map((tx) => (
+                  <TransactionRow key={tx.id} tx={tx} categories={categories} />
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+
+          {/* Mobile card list */}
+          <div className="flex flex-col gap-3 sm:hidden">
             {transactions.map((tx) => {
               const amount = Number(tx.amount);
+              const isTransfer = tx.isInternalTransfer || tx.category?.excludeFromTotals;
               return (
-                <tr key={tx.id}>
-                  <td className="whitespace-nowrap px-3 py-2">{formatDate(tx.date)}</td>
-                  <td className="px-3 py-2">
-                    {tx.merchantName ?? tx.name}
-                    {tx.pending && <span className="ml-2 text-xs text-amber-600 dark:text-amber-400">Pending</span>}
-                    {(tx.isInternalTransfer || tx.category?.excludeFromTotals) && (
-                      <span
-                        className="ml-2 text-xs text-foreground/50"
-                        title="Money moving between your own accounts — excluded from spend/income totals"
-                      >
-                        Transfer
+                <Card key={tx.id}>
+                  <CardContent className="flex flex-col gap-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-medium leading-tight">{tx.merchantName ?? tx.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatDate(tx.date)} · {tx.account.name}
+                        </p>
+                      </div>
+                      <span className={`font-medium tabular-nums ${amount > 0 ? "text-negative" : "text-positive"}`}>
+                        {formatCurrency(Math.abs(amount), tx.isoCurrencyCode ?? "USD")}
                       </span>
-                    )}
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-2 text-foreground/70">{tx.account.name}</td>
-                  <td className="whitespace-nowrap px-3 py-2">
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {tx.pending && (
+                        <Badge variant="outline" className="text-amber-600 dark:text-amber-400">
+                          Pending
+                        </Badge>
+                      )}
+                      {isTransfer && <Badge variant="secondary">Transfer</Badge>}
+                    </div>
                     <CategorySelect transactionId={tx.id} categoryId={tx.categoryId} categories={categories} />
-                  </td>
-                  <td
-                    className={`whitespace-nowrap px-3 py-2 text-right font-medium ${
-                      amount > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"
-                    }`}
-                  >
-                    {formatCurrency(Math.abs(amount), tx.isoCurrencyCode ?? "USD")}
-                  </td>
-                </tr>
+                  </CardContent>
+                </Card>
               );
             })}
-          </tbody>
-        </table>
-        {transactions.length === 0 && (
-          <p className="px-3 py-6 text-center text-sm text-foreground/60">No transactions found.</p>
-        )}
-      </div>
+          </div>
+        </>
+      )}
     </div>
+  );
+}
+
+function TransactionRow({
+  tx,
+  categories,
+}: {
+  tx: Prisma.TransactionGetPayload<{ include: { account: true; category: true } }>;
+  categories: { id: string; name: string }[];
+}) {
+  const amount = Number(tx.amount);
+  const isTransfer = tx.isInternalTransfer || tx.category?.excludeFromTotals;
+
+  return (
+    <TableRow>
+      <TableCell className="whitespace-nowrap text-muted-foreground">{formatDate(tx.date)}</TableCell>
+      <TableCell>
+        <div className="flex items-center gap-2">
+          <span>{tx.merchantName ?? tx.name}</span>
+          {tx.pending && (
+            <Badge variant="outline" className="text-amber-600 dark:text-amber-400">
+              Pending
+            </Badge>
+          )}
+          {isTransfer && (
+            <Badge
+              variant="secondary"
+              title="Money moving between your own accounts — excluded from spend/income totals"
+            >
+              Transfer
+            </Badge>
+          )}
+        </div>
+      </TableCell>
+      <TableCell className="whitespace-nowrap text-muted-foreground">{tx.account.name}</TableCell>
+      <TableCell>
+        <CategorySelect transactionId={tx.id} categoryId={tx.categoryId} categories={categories} />
+      </TableCell>
+      <TableCell className={`whitespace-nowrap text-right font-medium tabular-nums ${amount > 0 ? "text-negative" : "text-positive"}`}>
+        {formatCurrency(Math.abs(amount), tx.isoCurrencyCode ?? "USD")}
+      </TableCell>
+    </TableRow>
   );
 }

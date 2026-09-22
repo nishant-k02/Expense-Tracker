@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePlaidLink, type PlaidLinkOnSuccessMetadata } from "react-plaid-link";
+import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export function LinkButton() {
   const router = useRouter();
@@ -45,16 +47,12 @@ export function LinkButton() {
   });
 
   return (
-    <div className="flex flex-col gap-2">
-      <button
-        type="button"
-        onClick={() => open()}
-        disabled={!ready || loading}
-        className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
-      >
+    <div className="flex flex-col items-end gap-2">
+      <Button type="button" onClick={() => open()} disabled={!ready || loading}>
+        <Plus className="size-4" />
         {loading ? "Linking..." : "Link a bank account"}
-      </button>
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      </Button>
+      {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );
 }
