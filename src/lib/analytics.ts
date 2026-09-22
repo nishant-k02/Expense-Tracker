@@ -46,6 +46,31 @@ export async function getCategoryBreakdown(reference: Date = new Date()) {
   return Array.from(totals.values()).sort((a, b) => b.total - a.total);
 }
 
+export async function getSpendByInstitution(reference: Date = new Date()) {
+  const { start, end } = monthRange(reference);
+  const transactions = await prisma.transaction.findMany({
+    where: { date: { gte: start, lt: end }, amount: { gt: 0 } },
+    select: {
+      amount: true,
+      account: { select: { item: { select: { id: true, institutionName: true } } } },
+    },
+  });
+
+  const totals = new Map<string, { institutionName: string; spend: number }>();
+  for (const tx of transactions) {
+    const item = tx.account.item;
+    const existing = totals.get(item.id);
+    const amount = Number(tx.amount);
+    if (existing) {
+      existing.spend += amount;
+    } else {
+      totals.set(item.id, { institutionName: item.institutionName, spend: amount });
+    }
+  }
+
+  return Array.from(totals.values()).sort((a, b) => b.spend - a.spend);
+}
+
 export async function getMonthlyTrend(monthsBack = 6) {
   const now = new Date();
   const months: { label: string; start: Date; end: Date }[] = [];

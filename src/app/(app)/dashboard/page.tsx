@@ -1,4 +1,4 @@
-import { getCategoryBreakdown, getMonthlySummary, getMonthlyTrend } from "@/lib/analytics";
+import { getCategoryBreakdown, getMonthlySummary, getMonthlyTrend, getSpendByInstitution } from "@/lib/analytics";
 
 export const dynamic = "force-dynamic";
 import { formatCurrency } from "@/lib/format";
@@ -7,9 +7,10 @@ import { MonthlyTrendChart } from "@/components/dashboard/MonthlyTrendChart";
 import { SyncButton } from "@/components/plaid/SyncButton";
 
 export default async function DashboardPage() {
-  const [summary, breakdown, trend] = await Promise.all([
+  const [summary, breakdown, byInstitution, trend] = await Promise.all([
     getMonthlySummary(),
     getCategoryBreakdown(),
+    getSpendByInstitution(),
     getMonthlyTrend(),
   ]);
 
@@ -27,6 +28,26 @@ export default async function DashboardPage() {
         <SummaryCard label={`Credited in ${monthLabel}`} value={formatCurrency(summary.income)} tone="positive" />
         <SummaryCard label="Net" value={formatCurrency(summary.net)} tone={summary.net >= 0 ? "positive" : "negative"} />
       </div>
+
+      <section className="rounded-xl border border-black/10 p-4 dark:border-white/15">
+        <h2 className="mb-4 font-medium">Spend by bank — {monthLabel}</h2>
+        {byInstitution.length === 0 ? (
+          <p className="text-sm text-foreground/60">No spending recorded yet this month.</p>
+        ) : (
+          <ul className="flex flex-col divide-y divide-black/5 text-sm dark:divide-white/10">
+            {byInstitution.map((entry) => (
+              <li key={entry.institutionName} className="flex items-center justify-between py-2">
+                <span>{entry.institutionName}</span>
+                <span className="font-medium text-red-600 dark:text-red-400">{formatCurrency(entry.spend)}</span>
+              </li>
+            ))}
+            <li className="flex items-center justify-between py-2 font-semibold">
+              <span>Total (all banks)</span>
+              <span className="text-red-600 dark:text-red-400">{formatCurrency(summary.spend)}</span>
+            </li>
+          </ul>
+        )}
+      </section>
 
       <section className="rounded-xl border border-black/10 p-4 dark:border-white/15">
         <h2 className="mb-4 font-medium">Spend by category — {monthLabel}</h2>
