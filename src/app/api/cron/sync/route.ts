@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { syncAllItems } from "@/lib/plaid-sync";
+import { syncDetectedSubscriptions, syncInvestmentSchedules, flagOverdueSubscriptionsInactive } from "@/lib/subscriptions";
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -8,5 +9,8 @@ export async function GET(request: Request) {
   }
 
   await syncAllItems();
+  await syncDetectedSubscriptions();
+  await syncInvestmentSchedules();
+  await flagOverdueSubscriptionsInactive();
   return NextResponse.json({ ok: true });
 }

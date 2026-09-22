@@ -220,12 +220,26 @@ export async function detectSubscriptionCandidates(): Promise<SubscriptionCandid
   return candidates;
 }
 
+function advanceNextDueDate(from: Date, frequency: SubscriptionFrequency): Date | null {
+  const interval = FREQUENCY_RANGES.find((r) => r.frequency === frequency)?.intervalDays;
+  if (!interval) return null;
+  let nextDueDate = new Date(from.getTime() + interval * DAY_MS);
+  const now = Date.now();
+  while (nextDueDate.getTime() < now) {
+    nextDueDate = new Date(nextDueDate.getTime() + interval * DAY_MS);
+  }
+  return nextDueDate;
+}
+
 /**
  * Upserts detected candidates into the persisted Subscription table so they
  * become editable (billing email, next due date, active/inactive, etc.).
- * Rows the user has already edited (overridden=true) or added manually are
- * left untouched — detection only fills in gaps, never overwrites a
- * correction.
+ *
+ * A row the user has edited (overridden=true) keeps its corrections (name,
+ * billing email, active status, a manually-set frequency) — detection never
+ * reverts those. But its *schedule* still advances once a genuinely new
+ * charge posts: otherwise a corrected subscription's "next due" date would
+ * stay frozen forever, even after it actually renews in real life.
  */
 export async function syncDetectedSubscriptions(): Promise<void> {
   const candidates = await detectSubscriptionCandidates();
@@ -237,7 +251,7 @@ export async function syncDetectedSubscriptions(): Promise<void> {
     // detectionKey (merchant+amount) rather than the display `name`, so
     // renaming a row (e.g. "Apple ($6.97)" -> "Apple Music") doesn't cause
     // the next sync to recreate it under its original detected name.
-    await prisma.subscription.upsert({
+    const existing = await prisma.subscription.upsert({
       where: { accountId_detectionKey: { accountId: candidate.accountId, detectionKey: candidate.detectionKey } },
       create: {
         name: candidate.name,
@@ -254,20 +268,87 @@ export async function syncDetectedSubscriptions(): Promise<void> {
       update: {},
     });
 
-    // Refresh latest amount/frequency/dates, but only for rows the user
-    // hasn't edited — detection fills gaps, never overwrites a correction.
-    await prisma.subscription.updateMany({
-      where: {
-        accountId: candidate.accountId,
-        detectionKey: candidate.detectionKey,
-        source: "detected",
-        overridden: false,
-      },
+    if (!existing.overridden) {
+      // Not yet edited by the user — detection is the sole source of truth.
+      await prisma.subscription.update({
+        where: { id: existing.id },
+        data: {
+          amount: candidate.amount,
+          frequency: candidate.frequency,
+          nextDueDate: candidate.nextDueDate,
+          lastChargedDate: candidate.lastChargedDate,
+        },
+      });
+      continue;
+    }
+
+    const hasNewCharge =
+      !existing.lastChargedDate || candidate.lastChargedDate.getTime() > existing.lastChargedDate.getTime();
+    if (!hasNewCharge) continue;
+
+    // Prefer the user's already-confirmed frequency (e.g. a manually-set
+    // "quarterly" that a single historical charge can't yet prove) over a
+    // fresh "unknown" classification from sparse data.
+    const frequency: SubscriptionFrequency =
+      candidate.frequency !== "unknown"
+        ? candidate.frequency
+        : ((existing.frequency as SubscriptionFrequency | null) ?? "unknown");
+
+    // A new charge on a row marked inactive contradicts that status — real
+    // signal worth surfacing, but not something to silently reverse; the
+    // user may have deactivated it for a reason unrelated to billing (e.g. a
+    // refund or an erroneous charge).
+    const reactivationNote = !existing.isActive
+      ? `New charge detected (${candidate.lastChargedDate.toISOString().slice(0, 10)}) on a subscription marked inactive — review and reactivate manually if this is a real renewal.`
+      : null;
+
+    await prisma.subscription.update({
+      where: { id: existing.id },
       data: {
         amount: candidate.amount,
-        frequency: candidate.frequency,
-        nextDueDate: candidate.nextDueDate,
         lastChargedDate: candidate.lastChargedDate,
+        nextDueDate: advanceNextDueDate(candidate.lastChargedDate, frequency),
+        ...(candidate.frequency !== "unknown" ? { frequency: candidate.frequency } : {}),
+        ...(reactivationNote
+          ? { notes: existing.notes ? `${existing.notes}\n\n${reactivationNote}` : reactivationNote }
+          : {}),
+      },
+    });
+  }
+}
+
+/**
+ * Advances the "next due" schedule for recurring investments (e.g. a
+ * Robinhood scheduled buy) — these are deliberately excluded from
+ * detectSubscriptionCandidates() (they're transfers, not subscriptions), so
+ * they need their own lightweight check against real transaction data:
+ * whenever a newer transaction exists in the "Recurring Investments"
+ * category for the linked account, roll the schedule forward to it.
+ */
+export async function syncInvestmentSchedules(): Promise<void> {
+  const investments = await prisma.subscription.findMany({
+    where: { type: "investment", accountId: { not: null } },
+  });
+  if (investments.length === 0) return;
+
+  const category = await prisma.category.findUnique({ where: { name: "Recurring Investments" } });
+  if (!category) return;
+
+  for (const investment of investments) {
+    const latestTx = await prisma.transaction.findFirst({
+      where: { accountId: investment.accountId!, categoryId: category.id },
+      orderBy: { date: "desc" },
+    });
+    if (!latestTx) continue;
+    if (investment.lastChargedDate && latestTx.date.getTime() <= investment.lastChargedDate.getTime()) continue;
+
+    const frequency = (investment.frequency as SubscriptionFrequency | null) ?? "unknown";
+    await prisma.subscription.update({
+      where: { id: investment.id },
+      data: {
+        amount: Number(latestTx.amount),
+        lastChargedDate: latestTx.date,
+        nextDueDate: advanceNextDueDate(latestTx.date, frequency),
       },
     });
   }
@@ -276,4 +357,47 @@ export async function syncDetectedSubscriptions(): Promise<void> {
 export function isDueSoon(nextDueDate: Date | null, days = 7): boolean {
   if (!nextDueDate) return false;
   return (nextDueDate.getTime() - Date.now()) / DAY_MS <= days;
+}
+
+// How many days past its due date a subscription can go with no matching
+// charge before it's treated as canceled. Wide enough to absorb normal
+// billing/bank-posting lag without flagging a subscription too eagerly.
+const OVERDUE_GRACE_DAYS = 10;
+
+/**
+ * The closest thing to "real" cancellation detection available without a
+ * live login to Apple/Robinhood/Google/etc.: if a linked, active
+ * subscription's due date has passed by more than the grace period with no
+ * newer charge on record, the expected renewal didn't happen — the
+ * strongest signal bank data alone can give that it was actually canceled.
+ * Only touches rows with a linked account (no signal exists otherwise, e.g.
+ * Google One, which isn't paid from a tracked account) and never overrides a
+ * status the user already set some other way.
+ *
+ * Must run after syncDetectedSubscriptions()/syncInvestmentSchedules(), so
+ * nextDueDate already reflects any charge that *did* post before flagging.
+ */
+export async function flagOverdueSubscriptionsInactive(): Promise<void> {
+  const rows = await prisma.subscription.findMany({
+    where: { isActive: true, nextDueDate: { not: null }, accountId: { not: null } },
+  });
+
+  const now = Date.now();
+  for (const row of rows) {
+    const graceDeadline = row.nextDueDate!.getTime() + OVERDUE_GRACE_DAYS * DAY_MS;
+    if (now <= graceDeadline) continue;
+
+    const dueStr = row.nextDueDate!.toISOString().slice(0, 10);
+    const lastStr = row.lastChargedDate?.toISOString().slice(0, 10) ?? "unknown";
+    const note = `Auto-deactivated: expected charge did not post within ${OVERDUE_GRACE_DAYS} days of the due date (${dueStr}). Last real charge: ${lastStr}.`;
+
+    await prisma.subscription.update({
+      where: { id: row.id },
+      data: {
+        isActive: false,
+        overridden: true,
+        notes: row.notes ? `${row.notes}\n\n${note}` : note,
+      },
+    });
+  }
 }
