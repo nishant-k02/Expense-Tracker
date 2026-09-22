@@ -11,6 +11,12 @@ const AMOUNT_EPSILON = 0.01;
  * accounts rather than a payment to/from someone else (Zelle, Venmo, etc.),
  * which Plaid files under the same categories but is real income/spend.
  *
+ * Also included: LOAN_PAYMENTS_CREDIT_CARD_PAYMENT. Plaid categorizes a card
+ * payment asymmetrically — the paying (depository) side gets that detailed
+ * category, but the receiving (credit) side is just filed as a generic
+ * TRANSFER_IN. Without including both sides in one candidate pool, the
+ * receiving side never finds its counterpart and stays miscounted as income.
+ *
  * Matched transactions are flagged isInternalTransfer so dashboard totals
  * exclude them. Manually recategorized transactions (categoryOverridden) are
  * left untouched — the user's own classification wins.
@@ -18,8 +24,11 @@ const AMOUNT_EPSILON = 0.01;
 export async function detectInternalTransfers(): Promise<void> {
   const candidates = await prisma.transaction.findMany({
     where: {
-      plaidCategoryPrimary: { in: ["TRANSFER_IN", "TRANSFER_OUT"] },
       categoryOverridden: false,
+      OR: [
+        { plaidCategoryPrimary: { in: ["TRANSFER_IN", "TRANSFER_OUT"] } },
+        { plaidCategoryDetailed: "LOAN_PAYMENTS_CREDIT_CARD_PAYMENT" },
+      ],
     },
     select: { id: true, amount: true, date: true, accountId: true },
     orderBy: { date: "asc" },
