@@ -273,21 +273,6 @@ export async function syncDetectedSubscriptions(): Promise<void> {
   }
 }
 
-const MONTHLY_MULTIPLIER: Record<SubscriptionFrequency, number> = {
-  weekly: 4.345,
-  biweekly: 2.1725,
-  monthly: 1,
-  quarterly: 1 / 3,
-  annually: 1 / 12,
-  unknown: 1,
-};
-
-export function monthlyCost(amount: number | null, frequency: string | null): number {
-  if (amount === null) return 0;
-  const freq = (frequency ?? "unknown") as SubscriptionFrequency;
-  return amount * (MONTHLY_MULTIPLIER[freq] ?? 1);
-}
-
 export function isDueSoon(nextDueDate: Date | null, days = 7): boolean {
   if (!nextDueDate) return false;
   return (nextDueDate.getTime() - Date.now()) / DAY_MS <= days;
