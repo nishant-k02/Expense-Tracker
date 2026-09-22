@@ -1,10 +1,13 @@
+import { ArrowDownRight, ArrowUpRight, Scale, Landmark } from "lucide-react";
 import { getCategoryBreakdown, getMonthlySummary, getMonthlyTrend, getSpendByInstitution } from "@/lib/analytics";
-
-export const dynamic = "force-dynamic";
 import { formatCurrency } from "@/lib/format";
 import { SpendByCategoryChart } from "@/components/dashboard/SpendByCategoryChart";
 import { MonthlyTrendChart } from "@/components/dashboard/MonthlyTrendChart";
 import { SyncButton } from "@/components/plaid/SyncButton";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+
+export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const [summary, breakdown, byInstitution, trend] = await Promise.all([
@@ -17,47 +20,65 @@ export default async function DashboardPage() {
   const monthLabel = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(new Date());
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+          <p className="text-sm text-muted-foreground">{monthLabel}</p>
+        </div>
         <SyncButton label="Refresh all" />
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <SummaryCard label={`Spent in ${monthLabel}`} value={formatCurrency(summary.spend)} tone="negative" />
-        <SummaryCard label={`Credited in ${monthLabel}`} value={formatCurrency(summary.income)} tone="positive" />
-        <SummaryCard label="Net" value={formatCurrency(summary.net)} tone={summary.net >= 0 ? "positive" : "negative"} />
+        <SummaryCard label="Spent" value={summary.spend} tone="negative" icon={ArrowUpRight} />
+        <SummaryCard label="Credited" value={summary.income} tone="positive" icon={ArrowDownRight} />
+        <SummaryCard label="Net" value={summary.net} tone={summary.net >= 0 ? "positive" : "negative"} icon={Scale} />
       </div>
 
-      <section className="rounded-xl border border-black/10 p-4 dark:border-white/15">
-        <h2 className="mb-4 font-medium">Spend by bank — {monthLabel}</h2>
-        {byInstitution.length === 0 ? (
-          <p className="text-sm text-foreground/60">No spending recorded yet this month.</p>
-        ) : (
-          <ul className="flex flex-col divide-y divide-black/5 text-sm dark:divide-white/10">
-            {byInstitution.map((entry) => (
-              <li key={entry.institutionName} className="flex items-center justify-between py-2">
-                <span>{entry.institutionName}</span>
-                <span className="font-medium text-red-600 dark:text-red-400">{formatCurrency(entry.spend)}</span>
+      <Card>
+        <CardHeader>
+          <CardTitle>Spend by bank</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {byInstitution.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No spending recorded yet this month.</p>
+          ) : (
+            <ul className="flex flex-col divide-y divide-border text-sm">
+              {byInstitution.map((entry) => (
+                <li key={entry.institutionName} className="flex items-center justify-between py-2.5">
+                  <span className="flex items-center gap-2">
+                    <Landmark className="size-4 text-muted-foreground" />
+                    {entry.institutionName}
+                  </span>
+                  <span className="font-medium text-negative">{formatCurrency(entry.spend)}</span>
+                </li>
+              ))}
+              <li className="flex items-center justify-between pt-2.5 font-semibold">
+                <span>Total (all banks)</span>
+                <span className="text-negative">{formatCurrency(summary.spend)}</span>
               </li>
-            ))}
-            <li className="flex items-center justify-between py-2 font-semibold">
-              <span>Total (all banks)</span>
-              <span className="text-red-600 dark:text-red-400">{formatCurrency(summary.spend)}</span>
-            </li>
-          </ul>
-        )}
-      </section>
+            </ul>
+          )}
+        </CardContent>
+      </Card>
 
-      <section className="rounded-xl border border-black/10 p-4 dark:border-white/15">
-        <h2 className="mb-4 font-medium">Spend by category — {monthLabel}</h2>
-        <SpendByCategoryChart data={breakdown} />
-      </section>
+      <Card>
+        <CardHeader>
+          <CardTitle>Spend by category</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <SpendByCategoryChart data={breakdown} />
+        </CardContent>
+      </Card>
 
-      <section className="rounded-xl border border-black/10 p-4 dark:border-white/15">
-        <h2 className="mb-4 font-medium">Last 6 months</h2>
-        <MonthlyTrendChart data={trend} />
-      </section>
+      <Card>
+        <CardHeader>
+          <CardTitle>Last 6 months</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <MonthlyTrendChart data={trend} />
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -66,17 +87,31 @@ function SummaryCard({
   label,
   value,
   tone,
+  icon: Icon,
 }: {
   label: string;
-  value: string;
+  value: number;
   tone: "positive" | "negative";
+  icon: React.ComponentType<{ className?: string }>;
 }) {
   return (
-    <div className="rounded-xl border border-black/10 p-4 dark:border-white/15">
-      <p className="text-sm text-foreground/60">{label}</p>
-      <p className={`mt-1 text-2xl font-semibold ${tone === "positive" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-        {value}
-      </p>
-    </div>
+    <Card>
+      <CardContent className="flex items-start justify-between">
+        <div>
+          <p className="text-sm text-muted-foreground">{label}</p>
+          <p className={cn("mt-1 text-2xl font-semibold tabular-nums", tone === "positive" ? "text-positive" : "text-negative")}>
+            {formatCurrency(value)}
+          </p>
+        </div>
+        <div
+          className={cn(
+            "flex size-8 items-center justify-center rounded-lg",
+            tone === "positive" ? "bg-positive/10 text-positive" : "bg-negative/10 text-negative"
+          )}
+        >
+          <Icon className="size-4" />
+        </div>
+      </CardContent>
+    </Card>
   );
 }

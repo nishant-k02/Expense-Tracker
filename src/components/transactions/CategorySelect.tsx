@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export function CategorySelect({
   transactionId,
@@ -15,8 +16,7 @@ export function CategorySelect({
   const router = useRouter();
   const [pending, setPending] = useState(false);
 
-  async function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const nextCategoryId = e.target.value;
+  async function handleChange(nextCategoryId: string) {
     setPending(true);
     try {
       await fetch(`/api/transactions/${transactionId}`, {
@@ -31,20 +31,22 @@ export function CategorySelect({
   }
 
   return (
-    <select
-      value={categoryId ?? ""}
-      onChange={handleChange}
+    <Select
+      items={categories.map((c) => ({ label: c.name, value: c.id }))}
+      value={categoryId ?? undefined}
+      onValueChange={(v) => handleChange(String(v))}
       disabled={pending}
-      className="rounded-md border border-black/10 bg-transparent px-2 py-1 text-sm disabled:opacity-50 dark:border-white/15"
     >
-      <option value="" disabled>
-        Uncategorized
-      </option>
-      {categories.map((category) => (
-        <option key={category.id} value={category.id}>
-          {category.name}
-        </option>
-      ))}
-    </select>
+      <SelectTrigger size="sm" className="w-full sm:w-40">
+        <SelectValue placeholder="Uncategorized" />
+      </SelectTrigger>
+      <SelectContent>
+        {categories.map((category) => (
+          <SelectItem key={category.id} value={category.id}>
+            {category.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }

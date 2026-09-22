@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export function SyncButton({ itemId, label = "Refresh" }: { itemId?: string; label?: string }) {
   const router = useRouter();
@@ -22,13 +25,9 @@ export function SyncButton({ itemId, label = "Refresh" }: { itemId?: string; lab
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      disabled={loading}
-      className="rounded-md border border-black/10 px-3 py-1.5 text-sm transition hover:bg-black/5 disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/10"
-    >
+    <Button type="button" variant="outline" size="sm" onClick={handleClick} disabled={loading}>
+      <RefreshCw className={cn("size-3.5", loading && "animate-spin")} />
       {loading ? "Syncing..." : label}
-    </button>
+    </Button>
   );
 }
