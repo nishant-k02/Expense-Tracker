@@ -5,7 +5,11 @@ export function formatCurrency(amount: number | string | null | undefined, curre
   return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(value);
 }
 
+// All callers pass `@db.Date` values (calendar dates, not instants) that
+// Postgres/Prisma represent as UTC midnight. Formatting without a fixed
+// timeZone uses the server's local zone instead, which rolls the date back
+// by a day west of UTC (e.g. "2026-10-12" -> "Oct 11" in America/Chicago).
 export function formatDate(date: Date | string): string {
   const d = typeof date === "string" ? new Date(date) : date;
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(d);
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(d);
 }

@@ -1,4 +1,4 @@
-import { LayoutDashboard, Landmark, ArrowLeftRight, Settings, LogOut, Wallet } from "lucide-react";
+import { LayoutDashboard, Landmark, ArrowLeftRight, Repeat, Settings, LogOut, Wallet } from "lucide-react";
 import { auth, signOut } from "@/lib/auth";
 import { getProfile } from "@/lib/profile";
 import { SidebarNavLink } from "@/components/layout/SidebarNavLink";
@@ -9,6 +9,7 @@ export const NAV_LINKS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/accounts", label: "Accounts", icon: Landmark },
   { href: "/transactions", label: "Transactions", icon: ArrowLeftRight },
+  { href: "/subscriptions", label: "Subscriptions", icon: Repeat },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
