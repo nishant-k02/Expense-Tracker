@@ -77,7 +77,9 @@ export async function POST(request: Request) {
   }
 
   if (payload.webhook_type === "TRANSACTIONS" && payload.webhook_code === "SYNC_UPDATES_AVAILABLE") {
-    await syncTransactionsForItem(item.id);
+    // This webhook fires because new data is already ready — no need to
+    // request another refresh, just pull it.
+    await syncTransactionsForItem(item.id, false);
   } else if (
     payload.webhook_type === "ITEM" &&
     (payload.webhook_code === "ITEM_LOGIN_REQUIRED" || payload.webhook_code === "PENDING_EXPIRATION")
