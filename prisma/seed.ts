@@ -39,6 +39,15 @@ const DEFAULT_CATEGORIES: Array<{
   { name: "Transportation", plaidPrimary: "TRANSPORTATION", icon: "car" },
   { name: "Travel", plaidPrimary: "TRAVEL", icon: "plane" },
   { name: "Rent & Utilities", plaidPrimary: "RENT_AND_UTILITIES", icon: "home" },
+  // Not mapped from a Plaid primary (plaidPrimary: null) — Plaid has no
+  // "this is a subscription" category of its own, so charges land here only
+  // when reassigned from their raw Plaid category (e.g. Entertainment,
+  // General Services) after being confirmed as an active subscription.
+  { name: "Subscriptions", plaidPrimary: null, icon: "repeat" },
+  // Recurring investment contributions (e.g. a Robinhood scheduled buy) are
+  // real recurring outflows but not spending on a good or service — kept
+  // distinct from every other category, including "Subscriptions".
+  { name: "Recurring Investments", plaidPrimary: null, icon: "trending-up" },
   { name: "Uncategorized", plaidPrimary: null, icon: "help-circle" },
 ];
 

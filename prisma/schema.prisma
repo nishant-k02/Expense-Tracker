@@ -48,6 +48,42 @@ model Account {
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
   transactions     Transaction[]
+  subscriptions    Subscription[]
+}
+
+model Subscription {
+  id              String    @id @default(cuid())
+  name            String
+  // Which email account the subscription itself is under (e.g. Apple ID,
+  // Google account) — not derivable from bank data, so purely user-set.
+  billingEmail    String?
+  amount          Decimal?  @db.Decimal(10, 2)
+  currency        String?   @default("USD")
+  frequency       String?   // weekly | biweekly | monthly | quarterly | annually | unknown
+  nextDueDate     DateTime? @db.Date
+  lastChargedDate DateTime? @db.Date
+  accountId       String?
+  account         Account?  @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  categoryName    String?
+  isActive        Boolean   @default(true)
+  source          String    @default("manual") // manual | detected
+  // "investment" (e.g. a Robinhood recurring buy) is tracked here for
+  // visibility but must never be summed into subscription cost totals —
+  // it's a different category of recurring outflow, not a service subscription.
+  type            String    @default("subscription") // subscription | investment
+  // Stable identity for a detected candidate (merchant+amount), independent of
+  // display `name` — lets the user rename a detected row (e.g. "Apple ($6.97)"
+  // -> "Apple Music") without re-detection recreating a duplicate under the
+  // original name on the next sync. Null for manual/investment rows.
+  detectionKey    String?
+  // Once the user edits a detected row (or creates one manually), re-running
+  // detection must not silently overwrite their changes.
+  overridden      Boolean   @default(false)
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([accountId, detectionKey])
 }
 
 model Category {
