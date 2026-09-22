@@ -1,0 +1,73 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Item {
+  id               String    @id @default(cuid())
+  plaidItemId      String    @unique
+  plaidAccessToken String    // AES-256-GCM encrypted ciphertext, never plaintext
+  institutionId    String
+  institutionName  String
+  cursor           String?   // transactionsSync cursor, null until first sync
+  status           String    @default("active") // active | error | pending_expiration
+  error            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  accounts         Account[]
+}
+
+model Account {
+  id               String        @id @default(cuid())
+  itemId           String
+  item             Item          @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  plaidAccountId   String        @unique
+  name             String
+  officialName     String?
+  mask             String?
+  type             String        // depository | credit | loan | investment
+  subtype          String?       // checking | savings | credit card | ...
+  currentBalance   Decimal?      @db.Decimal(14, 2)
+  availableBalance Decimal?      @db.Decimal(14, 2)
+  isoCurrencyCode  String?       @default("USD")
+  hidden           Boolean       @default(false)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  transactions     Transaction[]
+}
+
+model Category {
+  id           String        @id @default(cuid())
+  name         String        @unique
+  plaidPrimary String?       @unique
+  icon         String?
+  isDefault    Boolean       @default(false)
+  transactions Transaction[]
+}
+
+model Transaction {
+  id                   String      @id @default(cuid())
+  accountId            String
+  account              Account     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  plaidTransactionId   String      @unique
+  amount               Decimal     @db.Decimal(14, 2) // Plaid convention: positive = money out, negative = inflow
+  isoCurrencyCode      String?     @default("USD")
+  date                 DateTime    @db.Date
+  authorizedDate       DateTime?   @db.Date
+  merchantName         String?
+  name                 String
+  pending              Boolean     @default(false)
+  plaidCategoryPrimary String?
+  categoryId           String?
+  category             Category?   @relation(fields: [categoryId], references: [id])
+  categoryOverridden   Boolean     @default(false)
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+
+  @@index([date])
+  @@index([accountId, date])
+  @@index([categoryId])
+}
