@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { Menu, Wallet, LogOut } from "lucide-react";
-import { NAV_LINKS } from "@/components/layout/Sidebar";
+import { NAV_LINKS } from "@/components/layout/nav-links";
 import { SidebarNavLink } from "@/components/layout/SidebarNavLink";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader } from "@/components/ui/sheet";
