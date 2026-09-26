@@ -76,6 +76,12 @@ model Subscription {
   // -> "Apple Music") without re-detection recreating a duplicate under the
   // original name on the next sync. Null for manual/investment rows.
   detectionKey    String?
+  // Plaid's raw merchantName for this row's real-world charges (e.g. "Apple",
+  // "Robinhood") — independent of `name` and `detectionKey`, used to find and
+  // re-categorize *new* matching transactions on every sync so a subscription
+  // or investment's real charges keep landing in the right category going
+  // forward, not just as a one-time fix applied to whatever already existed.
+  merchantName    String?
   // Once the user edits a detected row (or creates one manually), re-running
   // detection must not silently overwrite their changes.
   overridden      Boolean   @default(false)
