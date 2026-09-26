@@ -31,11 +31,11 @@ export function MonthSelector({ selectedMonth }: { selectedMonth: string }) {
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <>
       <select
         value={selectedMonth}
         onChange={(e) => router.push(`/dashboard?month=${e.target.value}`)}
-        className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"
+        className="h-9 min-w-0 rounded-md border border-input bg-background px-3 text-sm text-foreground"
         aria-label="Dashboard month"
       >
         {options.map((o) => (
@@ -44,10 +44,15 @@ export function MonthSelector({ selectedMonth }: { selectedMonth: string }) {
           </option>
         ))}
       </select>
-      <Button variant="outline" size="sm" render={<a href={`/api/reports/monthly?month=${selectedMonth}`} />}>
+      <Button
+        variant="outline"
+        size="sm"
+        className="justify-center"
+        render={<a href={`/api/reports/monthly?month=${selectedMonth}`} />}
+      >
         <FileDown className="size-4" />
         Download report
       </Button>
-    </div>
+    </>
   );
 }
