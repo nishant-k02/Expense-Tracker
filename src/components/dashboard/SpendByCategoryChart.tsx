@@ -18,7 +18,7 @@ const COLORS = [
 
 export function SpendByCategoryChart({ data }: { data: { name: string; total: number }[] }) {
   if (data.length === 0) {
-    return <p className="text-sm text-muted-foreground">No spending recorded yet this month.</p>;
+    return <p className="text-sm text-muted-foreground">No spending recorded this month.</p>;
   }
 
   return (

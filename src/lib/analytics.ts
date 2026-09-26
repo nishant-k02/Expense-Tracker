@@ -91,8 +91,10 @@ export async function getSpendByInstitution(reference: Date = new Date()) {
   return Array.from(totals.values()).sort((a, b) => b.spend - a.spend);
 }
 
-export async function getRecentTransactions(limit = 6) {
+export async function getRecentTransactions(limit = 6, reference?: Date) {
+  const dateFilter = reference ? monthRange(reference) : null;
   const transactions = await prisma.transaction.findMany({
+    where: dateFilter ? { date: { gte: dateFilter.start, lt: dateFilter.end } } : undefined,
     orderBy: { date: "desc" },
     take: limit,
     select: {
@@ -117,6 +119,37 @@ export async function getRecentTransactions(limit = 6) {
     accountName: tx.account.name,
     categoryName: tx.category?.name ?? "Uncategorized",
     isTransfer: tx.isInternalTransfer || Boolean(tx.category?.excludeFromTotals),
+  }));
+}
+
+export async function getSubscriptionActivity(reference: Date = new Date()) {
+  const { start, end } = monthRange(reference);
+  const transactions = await prisma.transaction.findMany({
+    where: {
+      date: { gte: start, lt: end },
+      category: { name: { in: ["Subscriptions", "Recurring Investments"] } },
+    },
+    select: {
+      id: true,
+      date: true,
+      name: true,
+      merchantName: true,
+      amount: true,
+      isoCurrencyCode: true,
+      category: { select: { name: true } },
+      account: { select: { name: true } },
+    },
+    orderBy: { date: "asc" },
+  });
+
+  return transactions.map((tx) => ({
+    id: tx.id,
+    date: tx.date,
+    description: tx.merchantName ?? tx.name,
+    amount: Number(tx.amount),
+    currency: tx.isoCurrencyCode ?? "USD",
+    accountName: tx.account.name,
+    categoryName: tx.category!.name as "Subscriptions" | "Recurring Investments",
   }));
 }
 
