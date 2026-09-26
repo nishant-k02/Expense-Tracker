@@ -82,6 +82,9 @@ export type SubscriptionCandidate = {
   // Stable identity (merchant+amount, independent of `name`) used to find an
   // existing row on re-sync even after the user has renamed it.
   detectionKey: string;
+  // Plaid's raw merchant name for this cluster — used to find and
+  // re-categorize matching transactions on every sync.
+  merchantName: string;
   accountId: string;
   amount: number;
   currency: string;
@@ -184,6 +187,7 @@ export async function detectSubscriptionCandidates(): Promise<SubscriptionCandid
           candidates.push({
             name,
             detectionKey,
+            merchantName: group.name,
             accountId: group.accountId,
             amount: avgAmount,
             currency: group.currency,
@@ -204,6 +208,7 @@ export async function detectSubscriptionCandidates(): Promise<SubscriptionCandid
         candidates.push({
           name,
           detectionKey,
+          merchantName: group.name,
           accountId: group.accountId,
           amount: avgAmount,
           currency: group.currency,
@@ -218,6 +223,44 @@ export async function detectSubscriptionCandidates(): Promise<SubscriptionCandid
   }
 
   return candidates;
+}
+
+// Same tolerance rule as clusterByAmount, reused here so a transaction is
+// only re-categorized when its amount genuinely matches this row's cluster
+// (e.g. distinguishing Apple Music's ~$6.99 charges from iCloud+'s ~$9.99
+// ones sharing the same merchant name).
+function isWithinAmountTolerance(amount: number, target: number): boolean {
+  return Math.abs(amount - target) <= Math.max(2, target * 0.15);
+}
+
+/**
+ * Keeps a subscription's or investment's real transactions correctly
+ * categorized on an ongoing basis — otherwise only transactions that
+ * existed at the moment of a one-off manual fix ever get tagged, and any
+ * new charge that posts afterward (a subsequent month's renewal) silently
+ * reverts to whatever raw category Plaid assigned it.
+ */
+async function categorizeMatchingTransactions(
+  accountId: string,
+  merchantName: string,
+  targetAmount: number,
+  categoryName: "Subscriptions" | "Recurring Investments"
+): Promise<void> {
+  const category = await prisma.category.findUnique({ where: { name: categoryName } });
+  if (!category) return;
+
+  const candidates = await prisma.transaction.findMany({
+    where: { accountId, merchantName: { equals: merchantName, mode: "insensitive" }, categoryId: { not: category.id } },
+    select: { id: true, amount: true },
+  });
+
+  const matchingIds = candidates.filter((tx) => isWithinAmountTolerance(Number(tx.amount), targetAmount)).map((tx) => tx.id);
+  if (matchingIds.length === 0) return;
+
+  await prisma.transaction.updateMany({
+    where: { id: { in: matchingIds } },
+    data: { categoryId: category.id, categoryOverridden: true },
+  });
 }
 
 function advanceNextDueDate(from: Date, frequency: SubscriptionFrequency): Date | null {
@@ -256,6 +299,7 @@ export async function syncDetectedSubscriptions(): Promise<void> {
       create: {
         name: candidate.name,
         detectionKey: candidate.detectionKey,
+        merchantName: candidate.merchantName,
         amount: candidate.amount,
         currency: candidate.currency,
         frequency: candidate.frequency,
@@ -267,6 +311,14 @@ export async function syncDetectedSubscriptions(): Promise<void> {
       },
       update: {},
     });
+
+    // Only for confirmed-active subscriptions — a merchant this app once
+    // detected but that turned out inactive (AWS, Google Cloud, YouTube,
+    // Rocketride) should never have its incidental charges relabeled
+    // "Subscriptions" going forward.
+    if (existing.isActive) {
+      await categorizeMatchingTransactions(candidate.accountId, candidate.merchantName, candidate.amount, "Subscriptions");
+    }
 
     if (!existing.overridden) {
       // Not yet edited by the user — detection is the sole source of truth.
@@ -327,28 +379,36 @@ export async function syncDetectedSubscriptions(): Promise<void> {
  */
 export async function syncInvestmentSchedules(): Promise<void> {
   const investments = await prisma.subscription.findMany({
-    where: { type: "investment", accountId: { not: null } },
+    where: { type: "investment", accountId: { not: null }, merchantName: { not: null } },
   });
   if (investments.length === 0) return;
 
-  const category = await prisma.category.findUnique({ where: { name: "Recurring Investments" } });
-  if (!category) return;
-
   for (const investment of investments) {
-    const latestTx = await prisma.transaction.findFirst({
-      where: { accountId: investment.accountId!, categoryId: category.id },
+    const amount = investment.amount ? Number(investment.amount) : null;
+    if (!amount) continue;
+
+    // Find and tag matching transactions directly by merchant+amount, rather
+    // than only looking for ones already categorized "Recurring Investments"
+    // — otherwise a new charge that hasn't been tagged yet is invisible to
+    // this sync and never gets picked up.
+    await categorizeMatchingTransactions(investment.accountId!, investment.merchantName!, amount, "Recurring Investments");
+
+    const latestTx = await prisma.transaction.findMany({
+      where: { accountId: investment.accountId!, merchantName: { equals: investment.merchantName!, mode: "insensitive" } },
+      select: { date: true, amount: true },
       orderBy: { date: "desc" },
     });
-    if (!latestTx) continue;
-    if (investment.lastChargedDate && latestTx.date.getTime() <= investment.lastChargedDate.getTime()) continue;
+    const latestMatch = latestTx.find((tx) => isWithinAmountTolerance(Number(tx.amount), amount));
+    if (!latestMatch) continue;
+    if (investment.lastChargedDate && latestMatch.date.getTime() <= investment.lastChargedDate.getTime()) continue;
 
     const frequency = (investment.frequency as SubscriptionFrequency | null) ?? "unknown";
     await prisma.subscription.update({
       where: { id: investment.id },
       data: {
-        amount: Number(latestTx.amount),
-        lastChargedDate: latestTx.date,
-        nextDueDate: advanceNextDueDate(latestTx.date, frequency),
+        amount: Number(latestMatch.amount),
+        lastChargedDate: latestMatch.date,
+        nextDueDate: advanceNextDueDate(latestMatch.date, frequency),
       },
     });
   }
