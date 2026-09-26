@@ -10,7 +10,7 @@ export function monthRange(reference: Date = new Date()): { start: Date; end: Da
 // matched as transfers between the user's own accounts (isInternalTransfer,
 // see src/lib/transfer-matching.ts) aren't real income or spending — they're
 // excluded here so they don't inflate or double-count the totals below.
-function isRealTransaction(tx: {
+export function isRealTransaction(tx: {
   isInternalTransfer: boolean;
   category: { excludeFromTotals: boolean } | null;
 }): boolean {

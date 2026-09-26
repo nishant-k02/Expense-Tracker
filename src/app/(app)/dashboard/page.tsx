@@ -11,6 +11,7 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import { SpendByCategoryChart } from "@/components/dashboard/SpendByCategoryChart";
 import { MonthlyTrendChart } from "@/components/dashboard/MonthlyTrendChart";
 import { SyncButton } from "@/components/plaid/SyncButton";
+import { ReportDownloadForm } from "@/components/dashboard/ReportDownloadForm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -42,7 +43,10 @@ export default async function DashboardPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
           <p className="text-sm text-muted-foreground">{monthLabel}</p>
         </div>
-        <SyncButton label="Refresh all" />
+        <div className="flex items-center gap-2">
+          <ReportDownloadForm />
+          <SyncButton label="Refresh all" />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
