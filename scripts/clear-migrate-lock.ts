@@ -24,7 +24,7 @@ async function main() {
       SELECT a.pid, a.state, a.query, a.query_start
       FROM pg_locks l
       JOIN pg_stat_activity a ON l.pid = a.pid
-      WHERE l.locktype = 'advisory' AND l.objid = ${LOCK_ID}::bigint
+      WHERE l.locktype = 'advisory' AND l.objid = ${LOCK_ID}::bigint AND a.pid != pg_backend_pid()
     `);
 
   console.log(`Sessions holding advisory lock ${LOCK_ID}:`, holders);

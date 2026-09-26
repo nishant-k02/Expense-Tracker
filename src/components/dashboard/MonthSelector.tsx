@@ -48,6 +48,7 @@ export function MonthSelector({ selectedMonth }: { selectedMonth: string }) {
         variant="outline"
         size="sm"
         className="justify-center"
+        nativeButton={false}
         render={<a href={`/api/reports/monthly?month=${selectedMonth}`} />}
       >
         <FileDown className="size-4" />
