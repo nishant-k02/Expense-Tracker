@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { monthRange } from "@/lib/analytics";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { CategorySelect } from "@/components/transactions/CategorySelect";
 import { TransactionFilters } from "@/components/transactions/TransactionFilters";
@@ -15,6 +16,7 @@ export default async function TransactionsPage(props: PageProps<"/transactions">
   const accountId = typeof searchParams.account === "string" ? searchParams.account : undefined;
   const categoryId = typeof searchParams.category === "string" ? searchParams.category : undefined;
   const q = typeof searchParams.q === "string" ? searchParams.q : undefined;
+  const month = typeof searchParams.month === "string" && /^\d{4}-\d{2}$/.test(searchParams.month) ? searchParams.month : undefined;
 
   const [accounts, categories] = await Promise.all([
     prisma.account.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
@@ -31,6 +33,13 @@ export default async function TransactionsPage(props: PageProps<"/transactions">
             { merchantName: { contains: q, mode: "insensitive" } },
           ],
         }
+      : {}),
+    ...(month
+      ? (() => {
+          const [year, m] = month.split("-").map(Number);
+          const { start, end } = monthRange(new Date(Date.UTC(year, m - 1, 1)));
+          return { date: { gte: start, lt: end } };
+        })()
       : {}),
   };
 
@@ -51,6 +60,7 @@ export default async function TransactionsPage(props: PageProps<"/transactions">
         defaultQuery={q}
         defaultAccount={accountId}
         defaultCategory={categoryId}
+        defaultMonth={month}
       />
 
       {transactions.length === 0 ? (

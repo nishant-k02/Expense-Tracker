@@ -8,19 +8,34 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 const ALL = "__all__";
 
+function monthOptions(count = 12) {
+  const now = new Date();
+  const options: { value: string; label: string }[] = [];
+  for (let i = 0; i < count; i++) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+    const value = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+    const label = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: "UTC" }).format(d);
+    options.push({ value, label });
+  }
+  return options;
+}
+
 export function TransactionFilters({
   accounts,
   categories,
   defaultQuery,
   defaultAccount,
   defaultCategory,
+  defaultMonth,
 }: {
   accounts: { id: string; name: string }[];
   categories: { id: string; name: string }[];
   defaultQuery?: string;
   defaultAccount?: string;
   defaultCategory?: string;
+  defaultMonth?: string;
 }) {
+  const months = monthOptions();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -54,6 +69,23 @@ export function TransactionFilters({
           className="pl-8"
         />
       </div>
+      <Select
+        items={[{ label: "All time", value: ALL }, ...months.map((m) => ({ label: m.label, value: m.value }))]}
+        value={defaultMonth ?? ALL}
+        onValueChange={(v) => updateParam("month", String(v))}
+      >
+        <SelectTrigger className="w-full sm:w-40">
+          <SelectValue placeholder="All time" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ALL}>All time</SelectItem>
+          {months.map((m) => (
+            <SelectItem key={m.value} value={m.value}>
+              {m.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
       <Select
         items={[{ label: "All accounts", value: ALL }, ...accounts.map((a) => ({ label: a.name, value: a.id }))]}
         value={defaultAccount ?? ALL}
